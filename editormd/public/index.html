@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <title>Hugo Markdown Page</title>
+    <link rel="stylesheet" href="../css/editormd.css" />
+</head>
+<body>
+    <div id="layout">
+        <div id="mdEditorHd">
+            <textarea id="mdTextID" style="display:none;"></textarea>
+        </div>
+        
+        <div id="mdselect" class="mdlist">
+            <div style="margin-top:20px; color:aquamarine;">
+                文章列表
+            </div>
+            <div id="mdlist" class="mdlist2"></div>
+            <div class="btbar">
+                <button class="bt" onclick="createMD()">新建</button>
+                <button class="bt" onclick="editAMD()">编辑</button>
+            </div>
+        </div>
+    </div>
+</body>
+
+<script src="../js/jquery.min.js"></script>
+<script src="../js/base64.min.js"></script>
+<script src="editormd.js"></script>
+<script type="text/javascript">
+    var mdEditorHd;
+    var mdlist = document.getElementById("mdselect");
+    function createMD(){
+        // 创建文件
+        mdselect.style.display = 'none';
+        editormd.toolbarHandlers.newmd();
+    };
+    
+    function editAMD(){
+        mdselect.style.display = 'none';
+        // 打开文件
+        $.get("/ischeck").done(function(res){
+            var fname = editormd.mdFileName;
+            var tmpPassWd = "";
+            var textarea = document.getElementById("mdTextID");
+            if(JSON.parse(res)['Code']==200 
+            && JSON.parse(res)['Info'])
+            {
+                // 需要密码
+                tmpPassWd = Number(prompt("请输入验证密码:"));
+            }
+            $.post("/open",{
+                "passwd":tmpPassWd,
+                "name":fname
+            }).done(function(res){
+                if(JSON.parse(res)['Code'] == 200) {
+                    openMD(Base64.decode(JSON.parse(res)['Info']));
+                }else{
+                    alert("错误:\n"+res);
+                }
+            });
+        });
+    };
+
+    async function selectMD() {
+        await $.get("/list").done(function(res){
+            if(JSON.parse(res)['Code']==200)
+            {
+                if(JSON.parse(res)['Info'].length>0)
+                {
+                    var mdlist = document.getElementById("mdlist");
+                    var items1 = mdlist.getElementsByClassName('mdlistItem');
+                    
+                    for(var i=items1.length;i>0;i--){
+                        mdlist.removeChild(items1[i-1]);
+                    };
+                    for(var pItem of JSON.parse(res)['Info'])
+                    {
+                        var onClickItem = document.createElement('div');
+                        onClickItem.className = 'mdlistItem';
+                        onClickItem.onclick = function(){
+                            editormd.mdFileName = event.currentTarget.innerHTML;
+                            var items = mdlist.getElementsByClassName('mdlistItem');
+                            for(var i=0;i<items.length;i++){
+                                items[i].style.background = "";
+                            };
+                            event.currentTarget.style.background = "rgba(8, 244, 87, 0.829)";
+                        };
+                        var txtNode = document.createTextNode(pItem);
+                        onClickItem.appendChild(txtNode);
+                        mdlist.appendChild(onClickItem);
+                    }
+                }
+            }
+        });
+    }
+
+    function openMD(md) {
+        mdEditorHd = editormd("mdEditorHd", {
+            mode:"markdown",
+            width   : "100%",
+            height  : "100%",
+            syncScrolling : "single",
+            path    : "../lib/",
+            theme : "dark",
+            previewTheme : "dark",
+            editorTheme : "pastel-on-dark",
+            markdown : md,
+            searchReplace : true,
+            htmlDecode : "style,script,iframe|on*",            // 开启 HTML 标签解析，为了安全性，默认不开启    
+            emoji : true,
+            taskList : true,
+            tocm: true,         // Using [TOCM]
+            tex : true,                   // 开启科学公式TeX语言支持，默认关闭
+            flowChart : true,             // 开启流程图支持，默认关闭
+            sequenceDiagram : true,       // 开启时序/序列图支持，默认关闭,
+            imageUpload : true,
+            imageFormats : ["jpg", "jpeg", "gif", "png", "bmp", "webp"],
+            
+            onload : function() {
+                mdEditorHd.fullscreen();
+            }
+        });
+    };
+
+    if (editormd.mdFileName == "") {
+        mdselect.style.display = 'block';
+        selectMD();
+    }
+    else{
+        mdselect.style.display = 'none';
+    }
+</script>
+
+<style>
+    .mdlist {
+        width:400px;
+        height:500px;
+        top:0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        color:rgb(247, 246, 246);
+        background-color: rgba(48, 51, 49, 0.557);
+        margin: auto;
+        position: absolute;
+        border-radius: 30px;
+        text-align: center;
+        display: 'none';
+        z-index: 999;
+    }
+    .mdlist2 {
+        margin: 10px;
+        width:380px;
+        height:380px;
+        overflow: auto;
+    }
+    .mdlistItem {
+        height:60px;
+        background-color: rgba(10, 149, 255, 0.557);
+        margin: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        color:bisque;
+    }
+    .btbar {
+        display: flex;
+        justify-content: space-around; 
+    }
+    .bt {
+        height:40px;
+        width: 160px; 
+        background-color: rgba(10, 149, 255, 0.557);
+        border: none;
+        color:aquamarine;
+    }
+
+    .mdlist2::-webkit-scrollbar {/*滚动条整体样式*/
+        width: 10px;     /*高宽分别对应横竖滚动条的尺寸*/
+        height: 1px;
+    }
+    .mdlist2::-webkit-scrollbar-thumb {/*滚动条里面小方块*/
+        border-radius: 10px;
+         -webkit-box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+        background: #535353;
+    }
+    .mdlist2::-webkit-scrollbar-track {/*滚动条里面轨道*/
+        -webkit-box-shadow: inset 0 0 5px rgba(0,0,0,0.2);
+        border-radius: 10px;
+        background: #EDEDED;
+    }
+</style>
+
+</html>
