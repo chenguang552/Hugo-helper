@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/base64"
 	"encoding/json"
 	"flag"
@@ -11,9 +12,11 @@ import (
 	"path/filepath"
 )
 
-var _port string
-var _page string
+//go:embed editormd/*
+var editormdFS embed.FS
+
 var _hugo string
+var _port string
 var _home string
 var _post string
 var _passwd string
@@ -21,7 +24,6 @@ var _passwd string
 func init() {
 	flag.StringVar(&_passwd, "passwd", "", "接口加密密码")
 	flag.StringVar(&_port, "port", "58880", "监听端口")
-	flag.StringVar(&_page, "page", "./editormd", "editor资源目录")
 	flag.StringVar(&_hugo, "hugo", "./hugo.exe", "hugo可执行程序的路径")
 	flag.StringVar(&_home, "home", "./blog", "创建的Blog根目录")
 	flag.StringVar(&_post, "posts", "content/posts", "创建的Blog文章目录")
@@ -29,7 +31,6 @@ func init() {
 
 	_hugo, _ = filepath.Abs(_hugo)
 	_home, _ = filepath.Abs(_home)
-	_page, _ = filepath.Abs(_page)
 
 	_, err := os.Stat(_home)
 	if os.IsNotExist(err) {
@@ -587,7 +588,7 @@ func main() {
 	http.HandleFunc("/ischeck", IsCheck)
 
 	// 代理editor.md的静态资源
-	http.Handle("/editormd/", http.StripPrefix("/editormd", http.FileServer(http.Dir(_page))))
+	http.Handle("/editormd/", http.FileServer(http.FS(editormdFS)))
 
 	http.Handle("/blog/", http.StripPrefix("/blog/", http.FileServer(http.Dir(_home+"/public"))))
 
