@@ -560,7 +560,7 @@ func redirectHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/", redirectHandler)
+	http.HandleFunc("/editor-helper", redirectHandler)
 	http.HandleFunc("/new", MdNew)
 	http.HandleFunc("/save", MdSave)
 	http.HandleFunc("/list", MdList)

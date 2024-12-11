@@ -3191,8 +3191,55 @@
             this.showInfoDialog();
         },
         
+        delmd : function() {
+            $.get("/ischeck").done(function(res){
+                var fname = editormd.mdFileName;
+                var tmpPassWd = "";
+                var textarea = document.getElementById("mdTextID");
+                if(JSON.parse(res)['Code']==200 
+                && JSON.parse(res)['Info'])
+                {
+                    // 需要密码
+                    tmpPassWd = Number(prompt("请输入验证密码:"));
+                }
+                $.post("/del",{
+                    "passwd":tmpPassWd,
+                    "name":fname,
+                    "content":Base64.encode(textarea.value)
+                }).done(function(res){
+                    if(JSON.parse(res)['Code'] == 200) {
+                        editormd.mdFileName = "";
+                        alert("文章已删除");
+                        selectMD();
+                    }else{
+                        alert("错误:\n"+res);
+                    }
+                });
+            });
+        },
         newmd : function() {
-            console.log("==========1111",editormd.mdFileName);
+            $.get("/ischeck").done(function(res){
+                var tmpPassWd = "";
+                if(JSON.parse(res)['Code']==200 
+                && JSON.parse(res)['Info'])
+                {
+                    // 需要密码
+                    tmpPassWd = Number(prompt("请输入验证密码:"));
+                }
+                var fname = String(prompt("请输入文章名称:"));
+                $.post("/new",{
+                    "passwd":tmpPassWd,
+                    "name":fname
+                }).done(function(res){
+                    if(JSON.parse(res)['Code'] == 200) {
+                        editormd.mdFileName = fname;
+                        openMD(Base64.decode(JSON.parse(res)['Info']));
+                        alert("新建文章已打开");
+                    }else{
+                        alert("错误:\n"+res);
+                    }
+                });
+            });
         },
         openmd: function() {
             var sl = document.getElementById("mdselect");
@@ -3249,7 +3296,6 @@
                 });
             });
         },
-
         hugo: function() {
             if(editormd.mdFileName == "") return;
             $.get("/ischeck").done(function(res){
