@@ -67,6 +67,8 @@ func IsCheck(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
+	r.ParseForm()
+
 	if r.Method == http.MethodOptions {
 		// 1. [必须]接受指定域的请求，可以使用*不加以限制，但不安全
 		w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
@@ -82,6 +84,21 @@ func IsCheck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var result HttpBack
+	var pass string = ""
+
+	_, check1 := r.Form["passwd"]
+
+	if check1 {
+		pass = r.Form["passwd"][0]
+	}
+
+	if !check(pass) {
+		result.Code = 99999
+		result.Info = "wrong password."
+		bytes, _ := json.Marshal(result)
+		w.Write(bytes)
+		return
+	}
 
 	result.Code = 200
 	result.Info = (_passwd != "")

@@ -59,6 +59,8 @@
     
         
     editormd.mdFileName   = "";
+    editormd.backpasswd   = "";
+
     editormd.title        = editormd.$name = "Editor.md";
     editormd.version      = "1.5.0";
     editormd.homePage     = "https://pandao.github.io/editor.md/";
@@ -3192,18 +3194,18 @@
         },
         
         delmd : function() {
-            $.get("/ischeck").done(function(res){
+            $.post("/ischeck",{
+                "passwd":editormd.backpasswd
+            }).done(function(res){
                 var fname = editormd.mdFileName;
-                var tmpPassWd = "";
                 var textarea = document.getElementById("mdTextID");
-                if(JSON.parse(res)['Code']==200 
-                && JSON.parse(res)['Info'])
-                {
-                    // 需要密码
-                    tmpPassWd = Number(prompt("请输入验证密码:"));
+                if(JSON.parse(res)['Code']!=200){
+                    // 重新输入密码
+                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
                 }
+
                 $.post("/del",{
-                    "passwd":tmpPassWd,
+                    "passwd":editormd.backpasswd,
                     "name":fname,
                     "content":Base64.encode(textarea.value)
                 }).done(function(res){
@@ -3218,17 +3220,20 @@
             });
         },
         newmd : function() {
-            $.get("/ischeck").done(function(res){
-                var tmpPassWd = "";
-                if(JSON.parse(res)['Code']==200 
-                && JSON.parse(res)['Info'])
-                {
-                    // 需要密码
-                    tmpPassWd = Number(prompt("请输入验证密码:"));
+            if(editormd.backpasswd == null){
+                // 需要密码
+                editormd.backpasswd = Number(prompt("请输入验证密码:"));
+            }
+            $.post("/ischeck",{
+                "passwd":editormd.backpasswd
+            }).done(function(res){
+                if(JSON.parse(res)['Code']!=200){
+                    // 重新输入密码
+                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
                 }
                 var fname = String(prompt("请输入文章名称:"));
                 $.post("/new",{
-                    "passwd":tmpPassWd,
+                    "passwd":editormd.backpasswd,
                     "name":fname
                 }).done(function(res){
                     if(JSON.parse(res)['Code'] == 200) {
@@ -3245,46 +3250,53 @@
             var sl = document.getElementById("mdselect");
             sl.style.display = 'block';
             selectMD();
-            // $.get("/ischeck").done(function(res){
-            //     var fname = editormd.mdFileName;
-            //     var tmpPassWd = "";
-            //     var textarea = document.getElementById("mdTextID");
-            //     if(JSON.parse(res)['Code']==200 
-            //     && JSON.parse(res)['Info'])
-            //     {
-            //         // 需要密码
-            //         tmpPassWd = Number(prompt("请输入验证密码:"));
-            //     }
-            //     $.post("/open",{
-            //         "passwd":tmpPassWd,
-            //         "name":fname
-            //     }).done(function(res){
-            //         if(JSON.parse(res)['Code'] == 200) {
-            //             openMD(Base64.decode(JSON.parse(res)['Info']));
-            //             // alert("文章已打开");
-            //         }else{
-            //             alert("错误:\n"+res);
-            //         }
-            //     });
-            // });
+        },
+        editmd: function() {
+            // 打开文件
+            if(editormd.backpasswd == null){
+                // 需要密码
+                editormd.backpasswd = Number(prompt("请输入验证密码:"));
+            }
+            $.post("/ischeck",{
+                "passwd":editormd.backpasswd
+            }).done(function(res){
+                var fname = editormd.mdFileName;
+                if(JSON.parse(res)['Code']!=200){
+                    // 重新输入密码
+                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                }
+                $.post("/open",{
+                    "passwd":editormd.backpasswd,
+                    "name":fname
+                }).done(function(res){
+                    if(JSON.parse(res)['Code'] == 200) {
+                        openMD(Base64.decode(JSON.parse(res)['Info']));
+                    }else{
+                        alert("错误:\n"+res);
+                    }
+                });
+            });
         },
         savemd: function() {
             if(editormd.mdFileName == "") {
                 selectMD();
                 return;
             }
-            $.get("/ischeck").done(function(res){
+            if(editormd.backpasswd == null){
+                // 需要密码
+                editormd.backpasswd = Number(prompt("请输入验证密码:"));
+            }
+            $.post("/ischeck",{
+                "passwd":editormd.backpasswd
+            }).done(function(res){
                 var fname = editormd.mdFileName;
-                var tmpPassWd = "";
                 var textarea = document.getElementById("mdTextID");
-                if(JSON.parse(res)['Code']==200 
-                && JSON.parse(res)['Info'])
-                {
-                    // 需要密码
-                    tmpPassWd = Number(prompt("请输入验证密码:"));
+                if(JSON.parse(res)['Code']!=200){
+                    // 重新输入密码
+                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
                 }
                 $.post("/save",{
-                    "passwd":tmpPassWd,
+                    "passwd":editormd.backpasswd,
                     "name":fname,
                     "content":Base64.encode(textarea.value)
                 }).done(function(res){
@@ -3298,16 +3310,19 @@
         },
         hugo: function() {
             if(editormd.mdFileName == "") return;
-            $.get("/ischeck").done(function(res){
-                var tmpPassWd = "";
-                if(JSON.parse(res)['Code']==200 
-                && JSON.parse(res)['Info'])
-                {
-                    // 需要密码
-                    tmpPassWd = Number(prompt("请输入验证密码:"));
+            if(editormd.backpasswd == null){
+                // 需要密码
+                editormd.backpasswd = Number(prompt("请输入验证密码:"));
+            }
+            $.post("/ischeck",{
+                "passwd":editormd.backpasswd
+            }).done(function(res){
+                if(JSON.parse(res)['Code']!=200){
+                    // 重新输入密码
+                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
                 }
                 $.post("/hugo",{
-                    "passwd":""
+                    "passwd":editormd.backpasswd
                 }).done(function(res){
                     if(JSON.parse(res)['Code'] == 200) {
                         alert("博客内容更新完成");
