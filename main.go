@@ -6,10 +6,13 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"path/filepath"
+	"strings"
 )
 
 //go:embed editormd/*
@@ -572,24 +575,144 @@ func Hugo(w http.ResponseWriter, r *http.Request) {
 	w.Write(bytes)
 }
 
+var extList = map[string]bool{
+	".jpg":  true,
+	".jpeg": true,
+	".gif":  true,
+	".png":  true,
+	".bmp":  true,
+	".webp": true,
+}
+
+// 图片上传接口的特殊返回结构
+type ImgBackJSON struct {
+	Success int    `json:"success"`
+	Message string `json:"message"`
+	ImgUrl  string `json:"url"`
+	ImgLink string `json:"link"`
+}
+
+func ImgBackInfo(status int, msg string, url string, link string) []byte {
+	jInfo := ImgBackJSON{
+		Success: status,
+		Message: msg,
+		ImgUrl:  url,
+		ImgLink: link,
+	}
+
+	bInfo, _ := json.Marshal(jInfo)
+	return bInfo
+}
+
+// 图片上传
+func ImgUpdate(w http.ResponseWriter, r *http.Request) {
+
+	defer func() {
+		if err := recover(); err != nil {
+			http.Error(w, "接口异常", 99999)
+		}
+	}()
+
+	r.ParseForm()
+
+	if r.Method == http.MethodOptions {
+		// 1. [必须]接受指定域的请求，可以使用*不加以限制，但不安全
+		w.Header().Set("Access-Control-Allow-Origin", r.Header.Get("Origin"))
+		// 2. [必须]设置服务器支持的所有跨域请求的方法
+		w.Header().Set("Access-Control-Allow-Methods", "POST,GET,PUT,DELETE,OPTIONS")
+		// 3. [可选]服务器支持的所有头信息字段，不限于浏览器在"预检"中请求的字段
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type,Content-Length,Token")
+		// 4. [可选]设置XMLHttpRequest的响应对象能拿到的额外字段
+		w.Header().Set("Access-Control-Expose-Headers", "Access-Control-Allow-Headers,Token")
+		// 5. [可选]是否允许后续请求携带认证信息Cookir，该值只能是true，不需要则不设置
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		return
+	}
+
+	var name string = ""
+	var pass string = ""
+
+	_, check1 := r.Form["passwd"]
+	_, check2 := r.Form["name"]
+
+	if check1 {
+		pass = r.Form["passwd"][0]
+	}
+
+	if check2 {
+		name = r.Form["name"][0]
+	}
+
+	if name == "" {
+		// 文章名称为空
+		w.Write(ImgBackInfo(0, "文章名称为空", "", ""))
+		return
+	}
+
+	if !check(pass) {
+		// 密码错误
+		w.Write(ImgBackInfo(0, "密码错误", "", ""))
+		return
+	}
+
+	f, h, e := r.FormFile("editormd-image-file")
+	if e != nil {
+		// 接收数据错误
+		w.Write(ImgBackInfo(0, "接收数据错误", "", ""))
+		return
+	}
+	defer f.Close()
+
+	ext := strings.ToLower(path.Ext(h.Filename))
+	_, bExt := extList[ext]
+	if !bExt {
+		// 不接受的后缀
+		w.Write(ImgBackInfo(0, "不接受的后缀", "", ""))
+		return
+	}
+
+	// 创建文件
+	dstName := fmt.Sprintf("%s/%s/%s/img/%s", _home, _post, name, h.Filename)
+	dst, err := os.Create(dstName)
+	if err != nil {
+		// 创建本地文件失败
+		w.Write(ImgBackInfo(0, "创建本地文件失败", "", ""))
+		return
+	}
+	defer dst.Close()
+
+	// 将文件保存到服务器
+	_, err = io.Copy(dst, f)
+	if err != nil {
+		// 保存文件失败
+		w.Write(ImgBackInfo(0, "保存文件失败", "", ""))
+		return
+	}
+
+	url := fmt.Sprintf("img/%s", h.Filename)
+	link := fmt.Sprintf("%s/%s/%s", _post, name, url)
+	w.Write(ImgBackInfo(1, "上传成功", url, link))
+}
+
 // 重定向主页
-func redirectHandler(w http.ResponseWriter, r *http.Request) {
-	http.Redirect(w, r, "/editormd/public", http.StatusSeeOther)
+func redirectIndex(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/pages/editormd/public", http.StatusSeeOther)
 }
 
 func main() {
-	http.HandleFunc("/editor-helper", redirectHandler)
+	http.HandleFunc("/editor-helper", redirectIndex)
+
 	http.HandleFunc("/new", MdNew)
 	http.HandleFunc("/save", MdSave)
 	http.HandleFunc("/list", MdList)
 	http.HandleFunc("/open", MdOpen)
 	http.HandleFunc("/del", MdDel)
 	http.HandleFunc("/hugo", Hugo)
+	http.HandleFunc("/imgupdate", ImgUpdate)
 	http.HandleFunc("/ischeck", IsCheck)
 
 	// 代理editor.md的静态资源
-	http.Handle("/editormd/", http.FileServer(http.FS(editormdFS)))
-
+	http.Handle("/pages/", http.StripPrefix("/pages/", http.FileServer(http.FS(editormdFS))))
 	http.Handle("/blog/", http.StripPrefix("/blog/", http.FileServer(http.Dir(_home+"/public"))))
 
 	fmt.Println("hugo管理助手已启动 端口:", _port)
