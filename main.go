@@ -19,6 +19,7 @@ import (
 var editormdFS embed.FS
 
 var _hugo string
+var _ip string
 var _port string
 var _home string
 var _post string
@@ -26,6 +27,7 @@ var _passwd string
 
 func init() {
 	flag.StringVar(&_passwd, "passwd", "", "接口加密密码")
+	flag.StringVar(&_ip, "ip", "127.0.0.1", "本机IP")
 	flag.StringVar(&_port, "port", "58880", "监听端口")
 	flag.StringVar(&_hugo, "hugo", "./hugo.exe", "hugo可执行程序的路径")
 	flag.StringVar(&_home, "home", "./blog", "创建的Blog根目录")
@@ -158,20 +160,10 @@ func MdNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpFilePath := fmt.Sprintf("%s/%s/%s", _home, _post, name)
-	_, err := os.Stat(tmpFilePath)
-	if os.IsExist(err) || err == nil {
-		result.Code = 10000
-		result.Info = "posts existed."
-		bytes, _ := json.Marshal(result)
-		w.Write(bytes)
-		return
-	}
-
 	// 创建默认的文章
 	cmd := exec.Command(_hugo, "new", fmt.Sprintf("%s/%s.md", _post, name))
 	cmd.Dir = _home
-	err = cmd.Run()
+	err := cmd.Run()
 	if err != nil {
 		result.Code = 10001
 		result.Info = fmt.Sprintf("failed with %s\n", err)
@@ -180,38 +172,9 @@ func MdNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 修改文章目录结构
-	// 创建目录 xxx/[文章名]
-	err = os.MkdirAll(tmpFilePath, os.ModePerm)
-	if err != nil {
-		result.Code = 10002
-		result.Info = fmt.Sprintf("failed with %s\n", err)
-		bytes, _ := json.Marshal(result)
-		w.Write(bytes)
-		return
-	}
-	// 创建插图目录
-	err = os.MkdirAll(fmt.Sprintf("%s/%s", tmpFilePath, "img"), os.ModePerm)
-	if err != nil {
-		result.Code = 10003
-		result.Info = fmt.Sprintf("failed with %s\n", err)
-		bytes, _ := json.Marshal(result)
-		w.Write(bytes)
-		return
-	}
-	// 将xxx/[文章名].md 移动并改名 xxx/[文章名]/index.md
-	err = os.Rename(tmpFilePath+".md", tmpFilePath+"/index.md")
-	if err != nil {
-		result.Code = 10004
-		result.Info = fmt.Sprintf("failed with %s\n", err)
-		bytes, _ := json.Marshal(result)
-		w.Write(bytes)
-		return
-	}
-
 	result.Code = 200
-	result.Info, _ = os.ReadFile(tmpFilePath + "/index.md")
-	// fmt.Printf("%s", result.Info)
+	tmpFilePath := fmt.Sprintf("%s/%s/%s.md", _home, _post, name)
+	result.Info, _ = os.ReadFile(tmpFilePath)
 	bytes, _ := json.Marshal(result)
 	w.Write(bytes)
 }
@@ -271,7 +234,7 @@ func MdSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpFilePath := fmt.Sprintf("%s/%s/%s", _home, _post, name)
+	tmpFilePath := fmt.Sprintf("%s/%s/%s.md", _home, _post, name)
 	_, err := os.Stat(tmpFilePath)
 	if os.IsNotExist(err) {
 		result.Code = 20000
@@ -291,7 +254,7 @@ func MdSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = os.WriteFile(tmpFilePath+"/index.md", decodedBytes, os.ModePerm)
+	err = os.WriteFile(tmpFilePath, decodedBytes, os.ModePerm)
 	if err != nil {
 		result.Code = 20002
 		result.Info = fmt.Sprintf("save file err:%s\n", err)
@@ -333,22 +296,6 @@ func MdList(w http.ResponseWriter, r *http.Request) {
 
 	var result HttpBack
 
-	// var pass string = ""
-
-	// _, check1 := r.Form["passwd"]
-
-	// if check1 {
-	// 	pass = r.Form["passwd"][0]
-	// }
-
-	// if !check(pass) {
-	// 	result.Code = 99999
-	// 	result.Info = "wrong password."
-	// 	bytes, _ := json.Marshal(result)
-	// 	w.Write(bytes)
-	// 	return
-	// }
-
 	root := fmt.Sprintf("%s/%s", _home, _post)
 
 	filesDE, err := os.ReadDir(root)
@@ -365,7 +312,7 @@ func MdList(w http.ResponseWriter, r *http.Request) {
 		if file.Name() == "." || file.Name() == ".." {
 			continue
 		}
-		files = append(files, file.Name())
+		files = append(files, strings.TrimRight(file.Name(), ".md"))
 	}
 
 	if len(files) == 0 {
@@ -431,7 +378,7 @@ func MdOpen(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpFilePath := fmt.Sprintf("%s/%s/%s", _home, _post, name)
+	tmpFilePath := fmt.Sprintf("%s/%s/%s.md", _home, _post, name)
 	_, err := os.Stat(tmpFilePath)
 	if os.IsNotExist(err) {
 		result.Code = 40000
@@ -442,9 +389,24 @@ func MdOpen(w http.ResponseWriter, r *http.Request) {
 	}
 
 	result.Code = 200
-	result.Info, _ = os.ReadFile(tmpFilePath + "/index.md")
+	result.Info, _ = os.ReadFile(tmpFilePath)
 	bytes, _ := json.Marshal(result)
 	w.Write(bytes)
+}
+
+func deleteFolder(folderPath string) error {
+	err := filepath.Walk(folderPath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		return os.RemoveAll(path)
+	})
+
+	if err != nil {
+		return err
+	}
+
+	return os.Remove(folderPath)
 }
 
 // 删除文章
@@ -496,18 +458,11 @@ func MdDel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpFilePath := fmt.Sprintf("%s/%s/%s", _home, _post, name)
-	_, err := os.Stat(tmpFilePath)
-	if os.IsNotExist(err) {
-		result.Code = 50000
-		result.Info = "posts not existed."
-		bytes, _ := json.Marshal(result)
-		w.Write(bytes)
-		return
-	}
+	tmpFilePath := fmt.Sprintf("%s/%s/%s.md", _home, _post, name)
+	os.Remove(tmpFilePath)
 
-	os.RemoveAll(tmpFilePath)
-	os.RemoveAll(tmpFilePath + ".md")
+	imgdir := fmt.Sprintf("%s/public/MdImg/%s", _home, name)
+	deleteFolder(imgdir)
 
 	result.Code = 200
 	result.Info = "posts has deleted."
@@ -558,11 +513,67 @@ func Hugo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 设置博客主页地址
+	hugoTomlPath := fmt.Sprintf("%s/%s", _home, "hugo.toml")
+	_, err := os.Stat(hugoTomlPath)
+	if os.IsNotExist(err) {
+		result.Code = 60000
+		result.Info = "hugo.toml not existed."
+		bytes, _ := json.Marshal(result)
+		w.Write(bytes)
+		return
+	}
+
+	cfg, err := os.ReadFile(hugoTomlPath)
+	if err != nil {
+		result.Code = 60001
+		result.Info = "hugo.toml open err:" + err.Error()
+		bytes, _ := json.Marshal(result)
+		w.Write(bytes)
+		return
+	}
+
+	lines := strings.Split(fmt.Sprintf("%s", cfg), "\n")
+	b := false
+	index := -1
+	for i := 0; i < len(lines); i++ {
+		if strings.Contains(lines[i], "baseURL") {
+			line := strings.TrimSpace(lines[i])
+			if strings.HasPrefix(line, "baseURL") {
+				b = true
+				index = i
+			}
+		}
+	}
+
+	var newLines []string = make([]string, 0)
+
+	if !b {
+		newLines = append(newLines, fmt.Sprintf("baseURL = \"http://v%s:%s/blog\"", _ip, _port))
+	}
+
+	for i := 0; i < len(lines); i++ {
+		if i == index && b {
+			newLines = append(newLines, fmt.Sprintf("baseURL = \"http://%s:%s/blog\"", _ip, _port))
+			continue
+		}
+		newLines = append(newLines, fmt.Sprintf("%s", lines[i]))
+	}
+
+	err = os.WriteFile(hugoTomlPath, []byte(strings.Join(newLines, "\n")), os.ModePerm)
+	if err != nil {
+		result.Code = 60002
+		result.Info = "hugo.toml rewrite err:" + err.Error()
+		bytes, _ := json.Marshal(result)
+		w.Write(bytes)
+		return
+	}
+
 	cmd := exec.Command(_hugo)
 	cmd.Dir = _home
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
-		result.Code = 60000
+		result.Code = 60003
 		result.Info = fmt.Sprintf("failed with hugo:%s\n", err)
 		bytes, _ := json.Marshal(result)
 		w.Write(bytes)
@@ -672,8 +683,13 @@ func ImgUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 创建文件
-	dstName := fmt.Sprintf("%s/%s/%s/img/%s", _home, _post, name, h.Filename)
-	dst, err := os.Create(dstName)
+	dstName := fmt.Sprintf("%s/public/MdImg/%s", _home, name)
+	_, err := os.Stat(dstName)
+	if os.IsNotExist(err) {
+		os.MkdirAll(dstName, os.ModePerm)
+	}
+
+	dst, err := os.Create(dstName + "/" + h.Filename)
 	if err != nil {
 		// 创建本地文件失败
 		w.Write(ImgBackInfo(0, "创建本地文件失败", "", ""))
@@ -689,9 +705,8 @@ func ImgUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	url := fmt.Sprintf("img/%s", h.Filename)
-	link := fmt.Sprintf("%s/%s/%s", _post, name, url)
-	w.Write(ImgBackInfo(1, "上传成功", url, link))
+	url := fmt.Sprintf("/blog/MdImg/%s/%s", name, h.Filename)
+	w.Write(ImgBackInfo(1, "上传成功", url, url))
 }
 
 // 重定向主页
@@ -700,8 +715,9 @@ func redirectIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// 主页重定向
 	http.HandleFunc("/editor-helper", redirectIndex)
-
+	// 功能性接口
 	http.HandleFunc("/new", MdNew)
 	http.HandleFunc("/save", MdSave)
 	http.HandleFunc("/list", MdList)
@@ -710,13 +726,13 @@ func main() {
 	http.HandleFunc("/hugo", Hugo)
 	http.HandleFunc("/imgupdate", ImgUpdate)
 	http.HandleFunc("/ischeck", IsCheck)
-
 	// 代理editor.md的静态资源
 	http.Handle("/pages/", http.StripPrefix("/pages/", http.FileServer(http.FS(editormdFS))))
 	http.Handle("/blog/", http.StripPrefix("/blog/", http.FileServer(http.Dir(_home+"/public"))))
 
 	fmt.Println("hugo管理助手已启动 端口:", _port)
-	fmt.Printf("    主页地址:0.0.0.0:%s", _port)
+	fmt.Printf("    博客主页地址 :http://%s:%s/blog\n", _ip, _port)
+	fmt.Printf("    编辑主页地址 :http://%s:%s/editor-helper\n", _ip, _port)
 	err := http.ListenAndServe(":"+_port, nil)
 	if err != nil {
 		fmt.Println("服务器开启错误: ", err)
