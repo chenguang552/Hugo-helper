@@ -3201,7 +3201,7 @@
                 var textarea = document.getElementById("mdTextID");
                 if(JSON.parse(res)['Code']!=200){
                     // 重新输入密码
-                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                    editormd.backpasswd = String(prompt("请输入验证密码:"));
                 }
 
                 $.post("/del",{
@@ -3229,7 +3229,7 @@
             }).done(function(res){
                 if(JSON.parse(res)['Code']!=200){
                     // 重新输入密码
-                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                    editormd.backpasswd = String(prompt("请输入验证密码:"));
                 }
                 var fname = String(prompt("请输入文章名称:"));
                 $.post("/new",{
@@ -3255,7 +3255,7 @@
             // 打开文件
             if(editormd.backpasswd == null){
                 // 需要密码
-                editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                editormd.backpasswd = String(prompt("请输入验证密码:"));
             }
             $.post("/ischeck",{
                 "passwd":editormd.backpasswd
@@ -3263,7 +3263,7 @@
                 var fname = editormd.mdFileName;
                 if(JSON.parse(res)['Code']!=200){
                     // 重新输入密码
-                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                    editormd.backpasswd = String(prompt("请输入验证密码:"));
                 }
                 $.post("/open",{
                     "passwd":editormd.backpasswd,
@@ -3284,7 +3284,7 @@
             }
             if(editormd.backpasswd == null){
                 // 需要密码
-                editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                editormd.backpasswd = String(prompt("请输入验证密码:"));
             }
             $.post("/ischeck",{
                 "passwd":editormd.backpasswd
@@ -3293,7 +3293,7 @@
                 var textarea = document.getElementById("mdTextID");
                 if(JSON.parse(res)['Code']!=200){
                     // 重新输入密码
-                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                    editormd.backpasswd = String(prompt("请输入验证密码:"));
                 }
                 $.post("/save",{
                     "passwd":editormd.backpasswd,
@@ -3312,14 +3312,14 @@
             if(editormd.mdFileName == "") return;
             if(editormd.backpasswd == null){
                 // 需要密码
-                editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                editormd.backpasswd = String(prompt("请输入验证密码:"));
             }
             $.post("/ischeck",{
                 "passwd":editormd.backpasswd
             }).done(function(res){
                 if(JSON.parse(res)['Code']!=200){
                     // 重新输入密码
-                    editormd.backpasswd = Number(prompt("请输入验证密码:"));
+                    editormd.backpasswd = String(prompt("请输入验证密码:"));
                 }
                 $.post("/hugo",{
                     "passwd":editormd.backpasswd
